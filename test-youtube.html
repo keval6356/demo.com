@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .container {
+            background: #333;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .youtube-container {
+            width: 100%;
+            height: 300px;
+            background: #000;
+            border: 1px solid #666;
+            margin: 10px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background: #444;
+            color: white;
+            border: 1px solid #666;
+            border-radius: 4px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #28a745; }
+        .error { background: #dc3545; }
+        .info { background: #17a2b8; }
+    </style>
+</head>
+<body>
+    <h1>YouTube API Test</h1>
+    
+    <div class="container">
+        <h3>Test YouTube Player Creation</h3>
+        <input type="text" id="videoUrl" placeholder="Enter YouTube URL or Video ID" value="dQw4w9WgXcQ">
+        <button onclick="testPlayer()">Test Player</button>
+        <button onclick="testMultiplePlayers()">Test Multiple Players</button>
+        <div id="status"></div>
+    </div>
+
+    <div class="container">
+        <h3>Single Player Test</h3>
+        <div id="player1" class="youtube-container"></div>
+    </div>
+
+    <div class="container">
+        <h3>Multiple Players Test</h3>
+        <div id="players-grid">
+            <div class="youtube-container" data-index="0"></div>
+            <div class="youtube-container" data-index="1"></div>
+            <div class="youtube-container" data-index="2"></div>
+            <div class="youtube-container" data-index="3"></div>
+        </div>
+    </div>
+
+    <script>
+        let players = [];
+        let apiReady = false;
+
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function loadYouTubeAPI() {
+            if (window.YT && window.YT.Player) {
+                apiReady = true;
+                updateStatus('YouTube API already loaded', 'success');
+                return Promise.resolve();
+            }
+
+            return new Promise((resolve) => {
+                if (document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+                    window.onYouTubeIframeAPIReady = () => {
+                        apiReady = true;
+                        updateStatus('YouTube API loaded from existing script', 'success');
+                        resolve();
+                    };
+                } else {
+                    const tag = document.createElement('script');
+                    tag.src = 'https://www.youtube.com/iframe_api';
+                    tag.async = true;
+                    tag.defer = true;
+                    
+                    window.onYouTubeIframeAPIReady = () => {
+                        apiReady = true;
+                        updateStatus('YouTube API loaded from new script', 'success');
+                        resolve();
+                    };
+                    
+                    const firstScriptTag = document.getElementsByTagName('script')[0];
+                    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+                }
+            });
+        }
+
+        function extractVideoId(url) {
+            if (!url.includes('youtube') && !url.includes('youtu.be')) {
+                return url; // Assume it's already a video ID
+            }
+            const match = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+            return match ? match[1] : url;
+        }
+
+        async function testPlayer() {
+            try {
+                updateStatus('Loading YouTube API...', 'info');
+                await loadYouTubeAPI();
+                
+                const videoUrl = document.getElementById('videoUrl').value;
+                const videoId = extractVideoId(videoUrl);
+                
+                updateStatus(`Creating player for video: ${videoId}`, 'info');
+                
+                const container = document.getElementById('player1');
+                container.innerHTML = '';
+                
+                const player = new window.YT.Player(container, {
+                    height: '100%',
+                    width: '100%',
+                    videoId: videoId,
+                    playerVars: {
+                        autoplay: 0,
+                        controls: 1,
+                        modestbranding: 1,
+                        rel: 0,
+                        enablejsapi: 1
+                    },
+                    events: {
+                        onReady: (event) => {
+                            updateStatus('Player ready!', 'success');
+                            players[0] = event.target;
+                        },
+                        onError: (event) => {
+                            updateStatus(`Player error: ${event.data}`, 'error');
+                        }
+                    }
+                });
+                
+            } catch (error) {
+                updateStatus(`Error: ${error.message}`, 'error');
+                console.error('Test player error:', error);
+            }
+        }
+
+        async function testMultiplePlayers() {
+            try {
+                updateStatus('Loading YouTube API...', 'info');
+                await loadYouTubeAPI();
+                
+                const videoUrl = document.getElementById('videoUrl').value;
+                const videoId = extractVideoId(videoUrl);
+                
+                updateStatus(`Creating multiple players for video: ${videoId}`, 'info');
+                
+                const containers = document.querySelectorAll('#players-grid .youtube-container');
+                players = [];
+                
+                let loadedCount = 0;
+                const totalPlayers = containers.length;
+                
+                containers.forEach((container, index) => {
+                    container.innerHTML = '';
+                    
+                    const player = new window.YT.Player(container, {
+                        height: '100%',
+                        width: '100%',
+                        videoId: videoId,
+                        playerVars: {
+                            autoplay: 0,
+                            controls: 1,
+                            modestbranding: 1,
+                            rel: 0,
+                            enablejsapi: 1
+                        },
+                        events: {
+                            onReady: (event) => {
+                                players[index] = event.target;
+                                loadedCount++;
+                                updateStatus(`Player ${loadedCount}/${totalPlayers} ready`, 'success');
+                                
+                                if (loadedCount === totalPlayers) {
+                                    updateStatus('All players ready!', 'success');
+                                }
+                            },
+                            onError: (event) => {
+                                updateStatus(`Player ${index + 1} error: ${event.data}`, 'error');
+                                loadedCount++;
+                            }
+                        }
+                    });
+                });
+                
+            } catch (error) {
+                updateStatus(`Error: ${error.message}`, 'error');
+                console.error('Test multiple players error:', error);
+            }
+        }
+
+        // Load API on page load
+        window.addEventListener('load', () => {
+            loadYouTubeAPI();
+        });
+    </script>
+</body>
+</html>
